@@ -1,0 +1,11 @@
+{
+  "name": "dev-sweep",
+  "version": "0.1.0",
+  "description": "Find and clean IDE caches, node_modules, build artifacts eating your disk",
+  "bin": {
+    "dev-sweep": "./bin/dev-sweep.js"
+  },
+  "keywords": ["disk", "cleanup", "node_modules", "cache", "ide", "cursor", "vscode", "next.js", "dev-tools"],
+  "license": "MIT",
+  "type": "module"
+}
