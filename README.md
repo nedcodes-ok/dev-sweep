@@ -1,75 +1,77 @@
 # dev-sweep
 
-Find and clean IDE caches, `node_modules`, build artifacts, and other dev cruft eating your disk.
+Find and clean `node_modules`, build caches, and dev artifacts eating your disk. Zero dependencies.
 
-Like `ncdu` but it knows what `.next/`, `node_modules/`, `__pycache__/`, and IDE caches are — and which ones are safe to delete.
+```
+$ npx dev-sweep ~/projects
+
+dev-sweep v0.2.0
+Scanning: /home/you/projects (depth: 5)
+
+Found 12 artifacts totaling 4.82 GB:
+
+  SIZE        CAT     TYPE                     PATH
+  ------------------------------------------------------------------------------
+     1.92 GB  deps    npm/yarn dependencies    /home/you/projects/app/node_modules
+   843.2 MB  deps    npm/yarn dependencies    /home/you/projects/site/node_modules
+   412.0 MB  build   Next.js build cache      /home/you/projects/app/.next
+   ...
+
+  Total: 4.82 GB across 12 items
+  847 directories scanned
+```
 
 ## Install
 
 ```bash
-npm install -g dev-sweep
-```
-
-Or run directly:
-
-```bash
-npx dev-sweep
+npx dev-sweep           # run without installing
+npm i -g dev-sweep      # or install globally
 ```
 
 ## Usage
 
 ```bash
-# Scan current directory
-dev-sweep
-
-# Scan a specific path
-dev-sweep ~/projects
-
-# Also check IDE caches (~/.cursor, ~/.vscode, etc)
-dev-sweep --ide
-
-# Interactive cleanup — asks before deleting each item
-dev-sweep --clean
-
-# See what would be deleted without deleting
-dev-sweep --dry-run
-
-# Only show items larger than 50MB
-dev-sweep --min-size 50
-
-# Scan deeper (default is 5 levels)
-dev-sweep --max-depth 8
+dev-sweep                        # scan current directory
+dev-sweep ~/projects             # scan specific path
+dev-sweep --clean                # scan and offer to delete each match
+dev-sweep --dry-run              # show what would be deleted
+dev-sweep --ide                  # also check IDE caches (~/.cursor, ~/.vscode, etc)
+dev-sweep --sort name            # sort by: size (default), name, type
+dev-sweep --json                 # machine-readable JSON output
+dev-sweep --category deps        # filter: deps, build, cache, test, logs
+dev-sweep -s 0                   # show everything (no size minimum)
+dev-sweep -d 10                  # scan deeper (default: 5)
 ```
 
 ## What it finds
 
-| Pattern | Description |
-|---------|-------------|
-| `node_modules` | npm/yarn/pnpm dependencies |
-| `.next` | Next.js build cache |
-| `.nuxt` | Nuxt build cache |
-| `.turbo` | Turborepo cache |
-| `dist`, `build` | Build output |
-| `.cache` | Generic cache dirs |
-| `.parcel-cache` | Parcel bundler cache |
-| `.vite` | Vite dev server cache |
-| `coverage` | Test coverage reports |
-| `__pycache__` | Python bytecode |
-| `.pytest_cache` | Pytest cache |
-| `venv`, `.venv` | Python virtual environments |
-| `target` | Rust/Java build output |
-| `.eslintcache` | ESLint cache file |
-| `.tsbuildinfo` | TypeScript incremental build |
+**Dependencies** — `node_modules`, `.pnpm-store`, `.yarn`, `venv`, `.venv`, `vendor`, `bower_components`
 
-With `--ide`, also scans:
-- `~/.cursor` — Cursor IDE data
-- `~/.vscode` — VS Code extensions
-- `~/.config/Code` — VS Code cache
-- `~/.config/Cursor` — Cursor cache
+**Build output** — `.next`, `.nuxt`, `.angular`, `.expo`, `.svelte-kit`, `dist`, `build`, `out`, `.vercel`, `target`, `*.egg-info`
 
-## Zero dependencies
+**Caches** — `.turbo`, `.cache`, `.parcel-cache`, `.vite`, `.eslintcache`, `.tsbuildinfo`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `.gradle`
 
-Just Node.js. No packages to install.
+**Test/coverage** — `coverage`, `.nyc_output`, `storybook-static`
+
+**Logs** — `npm-debug.log`, `yarn-error.log`, `yarn-debug.log`
+
+**IDE** (with `--ide`) — `.cursor`, `.vscode`, `.config/Code`, `.config/Cursor`
+
+## JSON output
+
+```bash
+dev-sweep --json | jq '.results[] | select(.sizeMB > 100)'
+```
+
+Pipe to other tools, build dashboards, or automate cleanup.
+
+## Safety
+
+- Never deletes anything without `--clean` flag
+- Interactive per-item confirmation when cleaning
+- IDE caches are always skipped during clean (delete manually)
+- `--dry-run` shows what would be deleted without touching anything
+- Zero dependencies, zero network calls
 
 ## License
 

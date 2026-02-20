@@ -1,11 +1,29 @@
 {
   "name": "dev-sweep",
-  "version": "0.1.0",
-  "description": "Find and clean IDE caches, node_modules, build artifacts eating your disk",
+  "version": "0.2.0",
+  "description": "Find and clean node_modules, build caches, and dev artifacts eating your disk",
   "bin": {
     "dev-sweep": "./bin/dev-sweep.js"
   },
-  "keywords": ["disk", "cleanup", "node_modules", "cache", "ide", "cursor", "vscode", "next.js", "dev-tools"],
+  "keywords": [
+    "disk", "cleanup", "node_modules", "cache", "ide", "cursor", "vscode",
+    "next.js", "dev-tools", "cli", "devtools", "build-cache", "pycache",
+    "venv", "turbo", "pnpm", "yarn"
+  ],
+  "author": "nedcodes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cursorrulespacks/dev-sweep"
+  },
+  "homepage": "https://github.com/cursorrulespacks/dev-sweep#readme",
   "license": "MIT",
-  "type": "module"
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ]
 }
