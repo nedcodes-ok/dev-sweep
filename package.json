@@ -1,6 +1,6 @@
 {
   "name": "dev-sweep",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Find and clean node_modules, build caches, and dev artifacts eating your disk",
   "bin": {
     "dev-sweep": "./bin/dev-sweep.js"

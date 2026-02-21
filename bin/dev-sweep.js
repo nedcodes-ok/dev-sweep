@@ -4,7 +4,7 @@ import { readdir, stat, rm, writeFile } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { parseArgs } from 'node:util';
 
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';
 
 // Profiles: safe = always-regenerable stuff, aggressive = everything
 const SAFE_CATS = new Set(['deps', 'cache']);
@@ -85,6 +85,7 @@ const { values: opts, positionals } = parseArgs({
     json: { type: 'boolean', short: 'j' },
     category: { type: 'string' },
     profile: { type: 'string', short: 'p' },
+    yes: { type: 'boolean', short: 'y' },
   },
   allowPositionals: true,
   strict: false,
@@ -111,6 +112,7 @@ Options:
   -j, --json         Output results as JSON
   --category CAT     Filter by category: deps, build, cache, test, logs
   -p, --profile MODE Profile: safe (deps+cache only) or aggressive (everything)
+  -y, --yes          Skip confirmation prompts (use with --clean for automation)
   -v, --version      Show version
   -h, --help         Show this help
 
@@ -127,6 +129,7 @@ Examples:
   dev-sweep ~/projects           Scan specific path
   dev-sweep --clean              Scan and offer to delete
   dev-sweep -p safe --clean      Only clean safe-to-delete artifacts
+  dev-sweep -p safe -cy          Automated cleanup (no prompts, great for cron)
   dev-sweep -p aggressive        Show everything including build output
   dev-sweep --ide                Also check IDE caches
   dev-sweep --sort name          Sort alphabetically
@@ -367,37 +370,55 @@ async function main() {
         console.log(`  Would delete: ${f.path} (${formatSize(f.size)})`);
       }
     } else {
-      const readline = await import('node:readline');
-      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-      const ask = (q) => new Promise(r => rl.question(q, r));
-
       let cleaned = 0;
       let cleanedBytes = 0;
 
-      for (const f of found) {
-        if (f.isIDE) {
-          console.log(`  \x1b[2mSKIP (IDE): ${f.path} — delete IDE caches manually\x1b[0m`);
-          continue;
-        }
-        const answer = await ask(`  Delete ${f.path} (${formatSize(f.size)})? [y/N] `);
-        if (answer.toLowerCase() === 'y') {
+      if (opts.yes) {
+        // Non-interactive: delete everything that matches
+        for (const f of found) {
+          if (f.isIDE) {
+            console.log(`  \x1b[2mSKIP (IDE): ${f.path} — delete IDE caches manually\x1b[0m`);
+            continue;
+          }
           try {
             await rm(f.path, { recursive: true, force: true });
-            console.log(`    \x1b[32m✓ Deleted\x1b[0m`);
+            console.log(`  \x1b[32m✓\x1b[0m ${f.path} (${formatSize(f.size)})`);
             cleaned++;
             cleanedBytes += f.size;
           } catch (e) {
-            console.log(`    \x1b[31m✗ Failed: ${e.message}\x1b[0m`);
+            console.log(`  \x1b[31m✗\x1b[0m ${f.path}: ${e.message}`);
           }
-        } else {
-          console.log(`    Skipped`);
         }
+      } else {
+        const readline = await import('node:readline');
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const ask = (q) => new Promise(r => rl.question(q, r));
+
+        for (const f of found) {
+          if (f.isIDE) {
+            console.log(`  \x1b[2mSKIP (IDE): ${f.path} — delete IDE caches manually\x1b[0m`);
+            continue;
+          }
+          const answer = await ask(`  Delete ${f.path} (${formatSize(f.size)})? [y/N] `);
+          if (answer.toLowerCase() === 'y') {
+            try {
+              await rm(f.path, { recursive: true, force: true });
+              console.log(`    \x1b[32m✓ Deleted\x1b[0m`);
+              cleaned++;
+              cleanedBytes += f.size;
+            } catch (e) {
+              console.log(`    \x1b[31m✗ Failed: ${e.message}\x1b[0m`);
+            }
+          } else {
+            console.log(`    Skipped`);
+          }
+        }
+        rl.close();
       }
 
       if (cleaned > 0) {
         console.log(`\n  \x1b[32m✓ Cleaned ${cleaned} items, freed ${formatSize(cleanedBytes)}\x1b[0m`);
       }
-      rl.close();
     }
   }
 }
