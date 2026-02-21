@@ -4,7 +4,11 @@ import { readdir, stat, rm, writeFile } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { parseArgs } from 'node:util';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
+
+// Profiles: safe = always-regenerable stuff, aggressive = everything
+const SAFE_CATS = new Set(['deps', 'cache']);
+const AGGRESSIVE_CATS = new Set(['deps', 'cache', 'build', 'test', 'logs']);
 
 const TARGETS = [
   // JS/TS ecosystem
@@ -80,6 +84,7 @@ const { values: opts, positionals } = parseArgs({
     sort: { type: 'string', default: 'size' },
     json: { type: 'boolean', short: 'j' },
     category: { type: 'string' },
+    profile: { type: 'string', short: 'p' },
   },
   allowPositionals: true,
   strict: false,
@@ -105,13 +110,24 @@ Options:
   --sort TYPE        Sort by: size (default), name, type
   -j, --json         Output results as JSON
   --category CAT     Filter by category: deps, build, cache, test, logs
+  -p, --profile MODE Profile: safe (deps+cache only) or aggressive (everything)
   -v, --version      Show version
   -h, --help         Show this help
+
+Profiles:
+  safe         Only targets that are always regenerable: node_modules,
+               .cache, __pycache__, venv, .turbo, etc. (deps + cache)
+  aggressive   Everything: deps, caches, build output, coverage, logs.
+               Use when you want to reclaim maximum space.
+
+  Default (no profile): scans everything but doesn't filter by risk level.
 
 Examples:
   dev-sweep                      Scan current directory
   dev-sweep ~/projects           Scan specific path
   dev-sweep --clean              Scan and offer to delete
+  dev-sweep -p safe --clean      Only clean safe-to-delete artifacts
+  dev-sweep -p aggressive        Show everything including build output
   dev-sweep --ide                Also check IDE caches
   dev-sweep --sort name          Sort alphabetically
   dev-sweep --json               Machine-readable output
@@ -126,7 +142,14 @@ const maxDepth = parseInt(opts['max-depth'] || '5');
 const minSizeMB = parseFloat(opts['min-size'] || '1');
 const sortBy = opts.sort || 'size';
 const filterCat = opts.category || null;
+const profileName = opts.profile || null;
+const profileCats = profileName === 'safe' ? SAFE_CATS : profileName === 'aggressive' ? AGGRESSIVE_CATS : null;
 const isJSON = opts.json || false;
+
+if (profileName && !['safe', 'aggressive'].includes(profileName)) {
+  console.error(`Unknown profile: ${profileName}. Use "safe" or "aggressive".`);
+  process.exit(1);
+}
 
 const targetNames = new Set(TARGETS.filter(t => t.type !== 'pattern').map(t => t.name));
 const targetMap = Object.fromEntries(TARGETS.filter(t => t.type !== 'pattern').map(t => [t.name, t]));
@@ -189,7 +212,8 @@ async function scan(dir, depth) {
       const size = entry.isDirectory() ? await getDirSize(fullPath) : (await stat(fullPath).catch(() => ({ size: 0 }))).size;
       const sizeMB = size / (1024 * 1024);
       const target = targetMap[name];
-      if (sizeMB >= minSizeMB && (!filterCat || target.cat === filterCat)) {
+      const catMatch = (!filterCat || target.cat === filterCat) && (!profileCats || profileCats.has(target.cat));
+      if (sizeMB >= minSizeMB && catMatch) {
         found.push({
           path: fullPath,
           size,
@@ -208,7 +232,8 @@ async function scan(dir, depth) {
       const fullPath = join(dir, name);
       const size = await getDirSize(fullPath);
       const sizeMB = size / (1024 * 1024);
-      if (sizeMB >= minSizeMB && (!filterCat || patternMatch.cat === filterCat)) {
+      const catMatch2 = (!filterCat || patternMatch.cat === filterCat) && (!profileCats || profileCats.has(patternMatch.cat));
+      if (sizeMB >= minSizeMB && catMatch2) {
         found.push({
           path: fullPath,
           size,
@@ -273,7 +298,8 @@ function sortResults(results) {
 async function main() {
   if (!isJSON) {
     console.log(`\n\x1b[1mdev-sweep\x1b[0m v${VERSION}`);
-    console.log(`Scanning: ${scanRoot} (depth: ${maxDepth}${filterCat ? `, category: ${filterCat}` : ''})\n`);
+    const profileLabel = profileName ? `, profile: ${profileName}` : '';
+    console.log(`Scanning: ${scanRoot} (depth: ${maxDepth}${filterCat ? `, category: ${filterCat}` : ''}${profileLabel})\n`);
   }
 
   await scan(scanRoot, 0);
